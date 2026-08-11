@@ -37,18 +37,9 @@ installspec <- function(
     spec <- fromJSON(spec_path)
     r_path <- file.path(R.home('bin'), 'R')
     if (.Platform$OS.type == 'unix') {
-        # On Unix-likes, R's front-end is a POSIX
-        # shell script whose `-e`/`-f`/`--file=` argument handling reuses a
-        # plain, unexported local shell variable named `a` to hold
-        # the encoded expression text before it execs into the real R binary.
-        # Since POSIX shells retain a variable's *exported* attribute once
-        # inherited from the environment, this silently clobbers a
-        # pre-existing exported environment variable named `a` (e.g. one set
-        # by the user) for the entire lifetime of the R process -- issues/755.
-        # Launching via a small shell wrapper that pipes the startup
-        # expression into R's stdin instead avoids the `-e` code path (and
-        # thus the collision) entirely.
-        # Invalid on Windows where R is a compiled executable.
+        # Avoid passing the startup expression via -e: R's Unix front-end
+        # script can clobber a same-named env var when parsing it (#755).
+        # Piping it into R's stdin instead sidesteps that.
         e_idx <- which(vapply(spec$argv, identical, logical(1L), '-e'))
         e_expr <- spec$argv[[e_idx + 1L]]
         spec$argv <- list(
