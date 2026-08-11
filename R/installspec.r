@@ -35,7 +35,31 @@ installspec <- function(
     file.copy(srcdir, tmp_name, recursive = TRUE)
     spec_path <- file.path(tmp_name, 'kernelspec', 'kernel.json')
     spec <- fromJSON(spec_path)
-    spec$argv[[1]] <- file.path(R.home('bin'), 'R')
+    r_path <- file.path(R.home('bin'), 'R')
+    if (.Platform$OS.type == 'unix') {
+        # On Unix-likes, R's own front-end (`$(R RHOME)/bin/R`) is a POSIX
+        # shell script whose `-e`/`-f`/`--file=` argument handling reuses a
+        # plain, unexported local shell variable literally named `a` to hold
+        # the encoded expression text before it execs into the real R binary.
+        # Since POSIX shells retain a variable's *exported* attribute once
+        # inherited from the environment, this silently clobbers a
+        # pre-existing exported environment variable named `a` (e.g. one set
+        # by the user) for the entire lifetime of the R process -- see
+        # https://github.com/IRkernel/IRkernel/issues/755. Launching via a
+        # small shell wrapper that pipes the startup expression into R's
+        # stdin instead avoids the `-e` code path (and thus the collision)
+        # entirely. This isn't needed on Windows, where R's front-end is a
+        # compiled executable rather than a shell script.
+        e_idx <- which(vapply(spec$argv, identical, logical(1L), '-e'))
+        e_expr <- spec$argv[[e_idx + 1L]]
+        spec$argv <- list(
+            'sh', '-c',
+            sprintf('echo %s | exec %s --slave --args "$0"', shQuote(e_expr), shQuote(r_path)),
+            '{connection_file}'
+        )
+    } else {
+        spec$argv[[1]] <- r_path
+    }
     spec$display_name <- displayname
 
     spec$env <- if (!is.null(env)) env else namedlist()
