@@ -12,9 +12,9 @@
 #' @param sys_prefix   (optional) Install kernelspec using the \code{--sys-prefix} option of the currently detected jupyter (default: NULL)
 #' @param verbose      (optional) If \code{FALSE}, silence output of \code{install}
 #' @param env          (optional) Named list of environment variables to set in the kernel (default: NULL)
-#' 
+#'
 #' @return Exit code of the \code{jupyter kernelspec install} call.
-#' 
+#'
 #' @export
 installspec <- function(
     user = NULL, name = 'ir', displayname = 'R', rprofile = NULL, prefix = NULL, sys_prefix = NULL, verbose = getOption('verbose'), env = NULL
@@ -27,7 +27,7 @@ installspec <- function(
     if (is.null(user)) user <- (is.null(prefix) && is.null(sys_prefix))
     if (sum(user, !is.null(prefix), !is.null(sys_prefix)) > 1)
         stop('"user", "prefix", "sys_prefix" are mutually exclusive')
-    
+
     # make a kernelspec with the current interpreter's absolute path
     srcdir <- system.file('kernelspec', package = 'IRkernel')
     tmp_name <- tempfile()
@@ -37,7 +37,7 @@ installspec <- function(
     spec <- fromJSON(spec_path)
     r_path <- file.path(R.home('bin'), 'R')
     if (.Platform$OS.type == 'unix') {
-        # On Unix-likes, R's own front-end (`$(R RHOME)/bin/R`) is a POSIX
+        # On Unix-likes, R's front-end is a POSIX
         # shell script whose `-e`/`-f`/`--file=` argument handling reuses a
         # plain, unexported local shell variable literally named `a` to hold
         # the encoded expression text before it execs into the real R binary.
@@ -48,8 +48,7 @@ installspec <- function(
         # https://github.com/IRkernel/IRkernel/issues/755. Launching via a
         # small shell wrapper that pipes the startup expression into R's
         # stdin instead avoids the `-e` code path (and thus the collision)
-        # entirely. This isn't needed on Windows, where R's front-end is a
-        # compiled executable rather than a shell script.
+        # entirely. Invalid on Windows where R is a compiled executable.
         e_idx <- which(vapply(spec$argv, identical, logical(1L), '-e'))
         e_expr <- spec$argv[[e_idx + 1L]]
         spec$argv <- list(
@@ -69,15 +68,15 @@ installspec <- function(
         spec$env$R_PROFILE_USER <- rprofile
 
     write(toJSON(spec, pretty = TRUE, auto_unbox = TRUE), file = spec_path)
-    
+
     user_flag <- if (user) '--user' else character(0)
-    prefix_flag <- if (!is.null(prefix)) c('--prefix', prefix) else character(0) 
+    prefix_flag <- if (!is.null(prefix)) c('--prefix', prefix) else character(0)
     sys_prefix_flag <- if (!is.null(sys_prefix)) c('--sys-prefix', prefix) else character(0)
     quiet_flag <- if (!verbose) '--log-level=WARN' else character(0)
     args <- c('kernelspec', 'install', '--replace', '--name', name, user_flag, prefix_flag, sys_prefix_flag, quiet_flag, file.path(tmp_name, 'kernelspec'))
     exit_code <- system2('jupyter', args)
-    
+
     unlink(tmp_name, recursive = TRUE)
-    
+
     invisible(exit_code)
 }
